@@ -17,7 +17,7 @@
         .status-item b { color: #58a6ff; font-size: 0.95rem; }
         .highlight { color: #f2e05a !important; }
 
-        #log-window { height: 250px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; line-height: 1.6; margin-bottom: 15px; }
+        #log-window { height: 230px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; line-height: 1.6; margin-bottom: 15px; }
         .log-entry { margin-bottom: 6px; border-bottom: 1px dashed #21262d; padding-bottom: 4px; }
         .txt-success { color: #3fb950; font-weight: bold; }
         .txt-fail { color: #f85149; font-weight: bold; }
@@ -30,6 +30,13 @@
         .btn-defy:hover { background: #b62324; }
         .btn-sec { background: #30363d; color: #c9d1d9; }
         .btn-sec:hover { background: #8b949e; color: #fff; }
+
+        /* 입력 폼 스타일 */
+        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; text-align: left; }
+        .input-group label { font-size: 0.8rem; color: #8b949e; font-weight: bold; }
+        .input-group input { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; color: #fff; font-size: 0.9rem; outline: none; }
+        .input-group input:focus { border-color: #58a6ff; }
+        .input-row { display: flex; gap: 10px; }
 
         #epilogue-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1000; overflow: hidden; }
         .star-wars { display: flex; justify-content: center; position: relative; height: 100%; color: #f39c12; font-size: 1.2rem; font-weight: bold; font-family: sans-serif; perspective: 400px; }
@@ -48,15 +55,15 @@
 
     <div class="status-box">
         <div class="status-header">
-            <span id="ui-name-age">김야구 (16세)</span>
-            <span id="ui-team" class="highlight">덕수고등학교 1학년</span>
+            <span id="ui-name-age">선수 생성 중...</span>
+            <span id="ui-team" class="highlight">-</span>
         </div>
         <div class="status-grid">
+            <div class="stat-item"><span>체격 (신장/체중)</span><b id="ui-body" style="color:#c9d1d9;">-</b></div>
             <div class="stat-item"><span>OVR (능력치)</span><b id="ui-ovr">25</b></div>
             <div class="stat-item"><span>타격 / 수비</span><b id="ui-off-def">25 / 25</b></div>
             <div class="stat-item"><span>주력 / 멘탈</span><b id="ui-spd-men">25 / 50</b></div>
             <div class="stat-item"><span>감독 신임도</span><b id="ui-trust">50%</b></div>
-            <div class="stat-item"><span>팬 지지도</span><b id="ui-fans">0%</b></div>
             <div class="stat-item"><span>FA 자격</span><b id="ui-fa">불가 (0년)</b></div>
         </div>
     </div>
@@ -80,13 +87,16 @@
 
 <script>
     var p = {
-        name: "플레이어",
+        name: "김야구",
+        height: 183,
+        weight: 82,
+        school: "덕수고등학교",
         age: 16,
         grade: 1,
         week: 1,
         posMain: "",
         posSub: "",
-        team: "덕수고등학교",
+        team: "",
         offense: 25,
         defense: 25,
         speed: 25,
@@ -114,11 +124,11 @@
     function updateUI() {
         document.getElementById("ui-name-age").innerText = p.name + " (" + p.age + "세 / " + p.week + "주차)";
         document.getElementById("ui-team").innerText = p.team;
+        document.getElementById("ui-body").innerText = p.height + "cm / " + p.weight + "kg";
         document.getElementById("ui-ovr").innerText = getOvr();
         document.getElementById("ui-off-def").innerText = p.offense + " / " + p.defense;
         document.getElementById("ui-spd-men").innerText = p.speed + " / " + p.mental;
         document.getElementById("ui-trust").innerText = p.trust + "%";
-        document.getElementById("ui-fans").innerText = p.fans + "%";
         document.getElementById("ui-fa").innerText = p.kboYears >= 8 ? "FA 자격 획득!" : p.kboYears + "년 / 8년";
     }
 
@@ -143,11 +153,46 @@
             return;
         }
 
+        // 시작 프로필 생성 폼 UI
+        var html = '<div class="input-group"><label>선수 이름</label><input type="text" id="inp-name" value="김야구" placeholder="이름 입력"></div>' +
+            '<div class="input-group"><label>출신 고등학교</label><input type="text" id="inp-school" value="덕수고등학교" placeholder="예: 덕수고, 충암고, 광주일고"></div>' +
+            '<div class="input-row">' +
+                '<div class="input-group" style="flex:1;"><label>신장 (cm)</label><input type="number" id="inp-height" value="183"></div>' +
+                '<div class="input-group" style="flex:1;"><label>체중 (kg)</label><input type="number" id="inp-weight" value="82"></div>' +
+            '</div>' +
+            '<button class="btn" style="margin-top:10px;" onclick="saveProfile()">프로필 생성 완료</button>';
+
+        document.getElementById("action-area").innerHTML = html;
+        log("[시스템] 선수 프로필 및 출신 학교를 설정해 주세요.");
+    }
+
+    function saveProfile() {
+        var nameVal = document.getElementById("inp-name").value.trim();
+        var schoolVal = document.getElementById("inp-school").value.trim();
+        var heightVal = parseInt(document.getElementById("inp-height").value) || 180;
+        var weightVal = parseInt(document.getElementById("inp-weight").value) || 80;
+
+        p.name = nameVal || "김야구";
+        p.school = schoolVal || "덕수고등학교";
+        p.team = p.school + " 1학년";
+        p.height = heightVal;
+        p.weight = weightVal;
+
+        // 신장/체중 보정 스탯 (키가 크면 타격/구위 보너스, 가벼우면 주력 보너스)
+        if(p.height >= 188) p.offense += 5;
+        if(p.weight <= 75) p.speed += 5;
+
+        log("<span class='txt-event'>[생성 완료] " + p.school + "에 입학한 " + p.name + " (" + p.height + "cm / " + p.weight + "kg) 선수!</span>");
+        
+        selectPosUI();
+    }
+
+    function selectPosUI() {
+        updateUI();
         var html = '<p style="text-align:center; margin-bottom:10px;"><b>[포지션을 선택하세요]</b></p>' +
             '<button class="btn" onclick="setPos(\'타자\')">타자 (Batting)</button>' +
             '<button class="btn btn-sec" onclick="setPos(\'투수\')">투수 (Pitching)</button>';
         document.getElementById("action-area").innerHTML = html;
-        log("[시스템] 고등학교 1학년, 좆밥 야구부원 시절부터 커리어가 시작됩니다.");
     }
 
     function setPos(mainPos) {
@@ -165,8 +210,8 @@
 
     function setSubPos(subPos) {
         p.posSub = subPos;
-        log("<span class='txt-event'>[선택 완료] 포지션: " + p.posMain + " (" + p.posSub + ") | 능력치 상승!</span>");
-        p.offense = 50; p.defense = 45; p.speed = 45;
+        log("<span class='txt-event'>[선택 완료] 포지션: " + p.posMain + " (" + p.posSub + ") | 초기 능력을 정립합니다!</span>");
+        p.offense += 20; p.defense += 20; p.speed += 20;
         updateUI();
         autoSave();
         nextTurn();
@@ -208,7 +253,7 @@
             p.defenseWins++;
             p.fans += 2;
             p.defense += 1;
-            defText = "<br><span class='txt-success'>[호수비!] 당신의 다이빙 캐치가 팀을 구했습니다! (수비+1)</span>";
+            defText = "<br><span class='txt-success'>[호수비!] 다이빙 캐치로 팀을 구했습니다! (수비+1)</span>";
         }
 
         if(p.posMain === '타자') {
@@ -220,8 +265,8 @@
             document.getElementById("action-area").innerHTML = html;
         } else {
             var pitchRate = Math.min(85, Math.floor(p.offense * 0.85));
-            var html = '<p style="font-size:0.85rem; color:#8b949e;">[마운드] 타자와의 풀카운트 승부입니다.' + defText + '</p>' +
-                '<button class="btn" onclick="playPitch(\'fast\', ' + pitchRate + ')">[직구] 몸쪽 150km/h 승부</button>' +
+            var html = '<p style="font-size:0.85rem; color:#8b949e;">[마운드] 타자와의 승부 상황입니다.' + defText + '</p>' +
+                '<button class="btn" onclick="playPitch(\'fast\', ' + pitchRate + ')">[직구] 몸쪽 강속구 승부</button>' +
                 '<button class="btn btn-sec" onclick="playPitch(\'break\', ' + (pitchRate + 5) + ')">[변화구] 바깥쪽 떨어지는 공</button>' +
                 '<button class="btn btn-defy" onclick="playPitch(\'defy\', ' + (pitchRate - 15) + ')">[항명] 코치 사인 무시 강속구</button>';
             document.getElementById("action-area").innerHTML = html;
@@ -334,11 +379,11 @@
         var crawl = document.getElementById("crawl-text");
         
         crawl.innerHTML = "<h2>EPISODE FINAL</h2><br>" +
-            "<p>그저 공 하나에 울고 웃던 어린 소년이 있었습니다.</p><br>" +
+            "<p>" + p.school + "의 잔디밭에서 공을 던지던 어린 소년, " + p.name + ".</p><br>" +
             "<p>흙먼지 속에서 시작되었던 여정,</p>" +
             "<p>총 " + p.defyCount + "번의 불꽃같던 항명과 " + p.hr + "개의 홈런,</p>" +
             "<p>그리고 팀을 구했던 " + p.defenseWins + "번의 결정적 호수비는</p>" +
-            "<p>초록빛 잔디 위에 전설로 새겨졌습니다.</p><br>" +
+            "<p>KBO 리그 전설로 영원히 새겨졌습니다.</p><br>" +
             "<p><b>\"잘 가라, 우리들의 에이스여.\"</b></p>";
         
         overlay.style.display = "block";
@@ -350,8 +395,9 @@
 
     function showResultCard() {
         var card = document.getElementById("result-card");
-        document.getElementById("card-title").innerText = "<" + p.name + "> - 바람을 거스른 KBO 전설";
+        document.getElementById("card-title").innerText = "<" + p.name + "> - " + p.school + " 출신 전설";
         document.getElementById("card-stats").innerHTML = 
+            "• 체격 스펙: " + p.height + "cm / " + p.weight + "kg<br>" +
             "• 최종 소속: " + p.team + "<br>" +
             "• 최종 능력치(OVR): <b style='color:#58a6ff;'>" + getOvr() + "</b><br>" +
             "• 통산 안타: " + p.hits + "개 | 통산 홈런: " + p.hr + "개<br>" +

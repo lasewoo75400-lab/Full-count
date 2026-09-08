@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Road to the KBO - 텍스트 야구 시뮬레이션</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #0b0e14; color: #e6edf3; font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; display: flex; justify-content: center; padding: 15px; }
+        #game-box { width: 100%; max-width: 650px; background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+        h1 { text-align: center; color: #58a6ff; font-size: 1.4rem; margin-bottom: 15px; text-shadow: 0 0 10px rgba(88,166,255,0.3); }
+        
+        /* 상태 박스 UI */
+        .status-box { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 15px; font-size: 0.85rem; }
+        .status-header { display: flex; justify-content: space-between; border-bottom: 1px solid #30363d; padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; color: #f0f6fc; }
+        .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+        .status-item span { display: block; color: #8b949e; font-size: 0.75rem; }
+        .status-item b { color: #58a6ff; font-size: 0.95rem; }
+        .highlight { color: #f2e05a !important; }
+
+        /* 텍스트 로그 창 */
+        #log-window { height: 250px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85rem; line-height: 1.6; margin-bottom: 15px; }
+        .log-entry { margin-bottom: 6px; border-bottom: 1px dashed #21262d; padding-bottom: 4px; }
+        .txt-success { color: #3fb950; font-weight: bold; }
+        .txt-fail { color: #f85149; font-weight: bold; }
+        .txt-event { color: #d2a8ff; font-weight: bold; }
+
+        /* 선택지 버튼 영역 */
+        .action-area { display: flex; flex-direction: column; gap: 8px; }
+        .btn { background: #238636; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
+        .btn:hover { background: #2ea043; }
+        .btn-defy { background: #da3633; }
+        .btn-defy:hover { background: #b62324; }
+        .btn-sec { background: #30363d; color: #c9d1d9; }
+        .btn-sec:hover { background: #8b949e; color: #fff; }
+
+        /* 스타워즈 은퇴 연출 */
+        #epilogue-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1000; overflow: hidden; }
+        .star-wars { display: flex; justify-content: center; position: relative; height: 100%; color: #f39c12; font-size: 1.2rem; font-weight: bold; font-family: sans-serif; perspective: 400px; }
+        .crawl { position: relative; top: 100%; animation: crawl 40s linear forwards; text-align: justify; width: 80%; max-width: 500px; }
+        @keyframes crawl {
+            0% { top: 80%; transform: rotateX(20deg) translateZ(0); }
+            100% { top: -1500px; transform: rotateX(25deg) translateZ(-2500px); }
+        }
+        #result-card { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 450px; background: #161b22; border: 2px solid #58a6ff; border-radius: 12px; padding: 20px; z-index: 1001; text-align: center; box-shadow: 0 0 20px rgba(88,166,255,0.4); }
+    </style>
+</head>
+<body>
+
+<div id="game-box">
+    <h1>⚾ ROAD TO THE KBO</h1>
+
+    <!-- 실시간 상태 정보 박스 -->
+    <div class="status-box">
+        <div class="status-header">
+            <span id="ui-name-age">김야구 (16세)</span>
+            <span id="ui-team" class="highlight">덕수고등학교 1학년</span>
+        </div>
+        <div class="status-grid">
+            <div class="stat-item"><span>OVR (능력치)</span><b id="ui-ovr">25</b></div>
+            <div class="stat-item"><span>타격 / 수비</span><b id="ui-off-def">25 / 25</b></div>
+            <div class="stat-item"><span>주력 / 멘탈</span><b id="ui-spd-men">25 / 50</b></div>
+            <div class="stat-item"><span>감독 신임도</span><b id="ui-trust">50%</b></div>
+            <div class="stat-item"><span>팬 지지도</span><b id="ui-fans">0%</b></div>
+            <div class="stat-item"><span>FA 자격</span><b id="ui-fa">불가 (0년)</b></div>
+        </div>
+    </div>
+
+    <!-- 진행 상황 텍스트 로그 -->
+    <div id="log-window"></div>
+
+    <!-- 하단 선택지 버튼 영역 -->
+    <div id="action-area" class="action-area"></div>
+</div>
+
+<!-- 은퇴 오프닝 스크롤 오버레이 -->
+<div id="epilogue-overlay">
+    <div class="star-wars">
+        <div class="crawl" id="crawl-text"></div>
+    </div>
+</div>
+
+<!-- 은퇴 공유 카드 -->
+<div id="result-card">
+    <h2 style="color:#58a6ff; margin-bottom:10px;">🏆 명예의 전당 리포트</h2>
+    <p id="card-title" style="color:#f2e05a; font-weight:bold; margin-bottom:15px;"></p>
+    <div style="text-align:left; background:#0d1117; padding:12px; border-radius:6px; font-size:0.85rem; line-height:1.8; margin-bottom:15px;" id="card-stats"></div>
+    <button class="btn" style="width:100%;" onclick="location.reload()">새로운 커리어 시작하기</button>
+</div>
+
+<script>
+    // 기본 선수 상태 데이터
+    let p = {
+        name: "플레이어",
+        age: 16,
+        grade: 1, // 고1:1, 고2:2, 고3:3, 대학:4~7, 프로:8+
+        week: 1,
+        posMain: "", // 타자 / 투수
+        posSub: "",  // 포수, 내야, 외야 / 선발, 불펜
+        team: "덕수고등학교",
+        
+        // 스탯 (무한 성장)
+        offense: 25,
+        defense: 25,
+        speed: 25,
+        mental: 50,
+        
+        trust: 50,
+        fans: 0,
+        kboYears: 0, // KBO 등록 연수 (FA 기준)
+        
+        // 누적 기록
+        hits: 0,
+        hr: 0,
+        defenseWins: 0,
+        defyCount: 0,
+        contractMoney: 0
+    };
+
+    // 로컬 스토리지 저장
+    function autoSave() {
+        localStorage.setItem("kbo_baseball_save", JSON.stringify(p));
+    }
+
+    function getOvr() {
+        return Math.floor((p.offense + p.defense + p.speed + p.mental) / 4);
+    }
+
+    function updateUI() {
+        document.getElementById("ui-name-age").innerText = `${p.name} (${p.age}세 / ${p.week}주차)`;
+        document.getElementById("ui-team").innerText = p.team;
+        document.getElementById("ui-ovr").innerText = getOvr();
+        document.getElementById("ui-off-def").innerText = `${p.offense} / ${p.defense}`;
+        document.getElementById("ui-spd-men").innerText = `${p.speed} / ${p.mental}`;
+        document.getElementById("ui-trust").innerText = `${p.trust}%`;
+        document.getElementById("ui-fans").innerText = `${p.fans}%`;
+        document.getElementById("ui-fa").innerText = p.kboYears >= 8 ? "FA 자격 획득!" : `${p.kboYears}년 / 8년`;
+    }
+
+    function log(msg) {
+        const w = document.getElementById("log-window");
+        const div = document.createElement("div");
+        div.className = "log-entry";
+        div.innerHTML = msg;
+        w.appendChild(div);
+        w.scrollTop = w.scrollHeight;
+    }
+
+    // 1. 캐릭터 생성 (시작 단계)
+    function initGame() {
+        const saved = localStorage.getItem("kbo_baseball_save");
+        if(saved && confirm("저장된 게임 데이터가 있습니다. 불러오시겠습니까?")) {
+            p = JSON.parse(saved);
+            updateUI();
+            log("<span class='txt-event'>[시스템] 데이터 로드 완료. 커리어를 이어갑니다.</span>");
+            nextTurn();
+            return;
+        }
+
+        let html = `
+            <p style="text-align:center; margin-bottom:10px;"><b>[포지션을 선택하세요]</b></p>
+            <button class="btn" onclick="setPos('타자')">타자 (Batting)</button>
+            <button class="btn btn-sec" onclick="setPos('투수')">투수 (Pitching)</button>
+        `;
+        document.getElementById("action-area").innerHTML = html;
+        log("[시스템] 고등학교 1학년, 좆밥 야구부원 시절부터 커리어가 시작됩니다.");
+    }
+
+    function setPos(mainPos) {
+        p.posMain = mainPos;
+        if(mainPos === '타자') {
+            let html = `
+                <p style="text-align:center; margin-bottom:10px;"><b>[상세 수비 포지션 선택]</b></p>
+                <button class="btn" onclick="setSubPos('포수')">포수 (투수 리드 전용)</button>
+                <button class="btn btn-sec" onclick="setSubPos('내야수')">내야수 (1B/2B/3B/SS)</button>
+                <button class="btn btn-sec" onclick="setSubPos('외야수')">외야수 (LF/CF/RF)</button>
+            `;
+            document.getElementById("action-area").innerHTML = html;
+        } else {
+            setSubPos('선발투수');
+        }
+    }
+
+    function setSubPos(subPos) {
+        p.posSub = subPos;
+        log(`<span class='txt-event'>[선택 완료] 포지션: ${p.posMain} (${p.posSub}) | 초기 능력치 정립!</span>`);
+        
+        // 고교 에이스 빠른 성장 부여
+        p.offense = 50; p.defense = 45; p.speed = 45;
+        updateUI();
+        autoSave();
+        nextTurn();
+    }
+
+    // 2. 메인 루프 (턴 진행)
+    function nextTurn() {
+        if(p.age >= 38) {
+            triggerEpilogue();
+            return;
+        }
+
+        p.week++;
+        if(p.week > 4) {
+            p.week = 1;
+            p.age++;
+            if(p.grade >= 8) p.kboYears++; // 프로 등반 시 FA 등록 연수 축적
+        }
+
+        // 고3 졸업 시점 분기 (드래프트 vs 대학 진학)
+        if(p.age === 18 && p.grade === 3 && p.week === 4) {
+            handleDraftOrCollege();
+            return;
+        }
+
+        // KBO FA 자격 취득 또는 바이아웃 이적 이벤트
+        if(p.kboYears >= 8 && p.week === 1) {
+            handleFAEvent();
+            return;
+        }
+
+        autoSave();
+        updateUI();
+        showMatchSituation();
+    }
+
+    // 경기 타석 / 투구 선택지
+    function showMatchSituation() {
+        let ovr = getOvr();
+        // 수비 호수비 연산
+        let defSuccessRate = Math.min(90, Math.floor(p.defense * 0.8));
+        let defRoll = Math.random() * 100;
+        let defText = "";
+        if(defRoll < defSuccessRate) {
+            p.defenseWins++;
+            p.fans += 2;
+            p.defense += 1;
+            defText = "<br><span class='txt-success'>[호수비!] 당신의 눈부신 다이빙 캐치가 팀을 구했습니다! (수비+1)</span>";
+        }
+
+        if(p.posMain === '타자') {
+            let hitRate = Math.min(85, Math.floor(p.offense * 0.9));
+            let html = `
+                <p style="font-size:0.85rem; color:#8b949e;">[경기 상황] 결정적인 타석에 들어섰습니다. ${defText}</p>
+                <button class="btn btn-sec" onclick="playAtBat('auto', ${hitRate})">[자동] 능력치에 맡기기 (성공률 ${hitRate}%)</button>
+                <button class="btn" onclick="playAtBat('swing', ${hitRate + 10})">[휘두름] 풀스윙 장타 노리기 (성공률 ${hitRate-10}%)</button>
+                <button class="btn btn-sec" onclick="playAtBat('watch', ${hitRate})">[지켜봄] 볼카운트 싸움 / 볼넷</button>
+            `;
+            document.getElementById("action-area").innerHTML = html;
+        } else {
+            // 투수 피칭
+            let pitchRate = Math.min(85, Math.floor(p.offense * 0.85));
+            let html = `
+                <p style="font-size:0.85rem; color:#8b949e;">[마운드] 타자와의 풀카운트 승부입니다. ${defText}</p>
+                <button class="btn" onclick="playPitch('fast', ${pitchRate})">[직구] 몸쪽 150km/h 승부</button>
+                <button class="btn btn-sec" onclick="playPitch('break', ${pitchRate+5})">[변화구] 바깥쪽 뚝 떨어지는 공</button>
+                <button class="btn btn-defy" onclick="playPitch('defy', ${pitchRate-15})">[항명] 코치 사인 무시 강속구</button>
+            `;
+            document.getElementById("action-area").innerHTML = html;
+        }
+    }
+
+    function playAtBat(type, rate) {
+        let roll = Math.random() * 100;
+        if(type === 'swing') {
+            if(roll < rate) {
+                p.hits++; p.hr++; p.offense += 2; p.fans += 5;
+                log("<span class='txt-success'>[대성공] 통쾌한 장외 홈런 폭발! (타격+2, 팬지지도+5%)</span>");
+            } else {
+                p.trust -= 5;
+                log("<span class='txt-fail'>[실패] 큰 것 노리다 삼진 아웃!</span>");
+            }
+        } else if(type === 'watch') {
+            p.mental += 2;
+            log("<span class='txt-event'>[볼넷 출루] 차분하게 유인구를 참아내고 1루로 나갑니다. (멘탈+2)</span>");
+        } else {
+            if(roll < rate) {
+                p.hits++; p.offense += 1;
+                log("<span class='txt-success'>[안타] 결대로 밀어쳐 깨끗한 안타를 만들어냅니다.</span>");
+            } else {
+                log("<span class='txt-fail'>[범타] 내야 땅볼로 물러납니다.</span>");
+            }
+        }
+        nextTurn();
+    }
+
+    function playPitch(type, rate) {
+        let roll = Math.random() * 100;
+        if(type === 'defy') {
+            p.defyCount++;
+            if(roll < rate) {
+                p.fans += 10; p.mental += 3;
+                log("<span class='txt-success'>[항명 대성공] 감독 사인을 거부하고 헛스윙 삼진 유도! 팬 환호!</span>");
+            } else {
+                p.trust -= 15;
+                log("<span class='txt-fail'>[항명 실패] 고집부리다 적시타 허용. 감독이 대격노합니다.</span>");
+            }
+        } else {
+            if(roll < rate) {
+                p.offense += 1;
+                log("<span class='txt-success'>[탈삼진] 완벽한 코스 제구로 삼진을 뺏어냅니다. (구위+1)</span>");
+            } else {
+                log("<span class='txt-fail'>[피안타] 타자에게 정타를 허용합니다.</span>");
+            }
+        }
+        nextTurn();
+    }
+
+    // 3. 드래프트 및 대학 진학 분기
+    function handleDraftOrCollege() {
+        let ovr = getOvr();
+        log(`<br><span class='txt-event'>[고교 졸업] 3년간의 성적을 바탕으로 KBO 신인 드래프트가 개최됩니다! (OVR: ${ovr})</span>`);
+        
+        let html = "";
+        if(ovr >= 70) {
+            html = `
+                <p style="text-align:center; color:#f2e05a;"><b>🎉 KBO 신인 드래프트 1라운드 1순위 지명!</b></p>
+                <button class="btn" onclick="joinPro('한화 이글스', 50000)">한화 이글스 입단 (계약금 5억)</button>
+                <button class="btn btn-sec" onclick="goCollege()">[거절] 대학 진학 후 기량 더 다지기</button>
+            `;
+        } else if(ovr >= 55) {
+            html = `
+                <p style="text-align:center;"><b>KBO 드래프트 4라운드 지명</b></p>
+                <button class="btn" onclick="joinPro('SSG 랜더스', 10000)">SSG 랜더스 입단 (계약금 1억)</button>
+                <button class="btn btn-sec" onclick="goCollege()">[거절] 연세대학교 야구부 진학</button>
+            `;
+        } else {
+            html = `
+                <p style="text-align:center; color:#f85149;"><b>[지명 미발탁] 프로 드래프트 낙방...</b></p>
+                <button class="btn btn-sec" onclick="goCollege()">고려대학교 진학 (4년 후 재도전)</button>
+                <button class="btn" onclick="joinPro('육성선수', 0)">육성선수(신고선수) 입단</button>
+            `;
+        }
+        document.getElementById("action-area").innerHTML = html;
+    }
+
+    function joinPro(teamName, money) {
+        p.team = teamName;
+        p.grade = 8; // 프로 신분
+        p.contractMoney += money;
+        log(`<span class='txt-success'>[프로 입단] ${teamName}의 유니폼을 입고 KBO 무대에 첫발을 내딛습니다!</span>`);
+        nextTurn();
+    }
+
+    function goCollege() {
+        p.team = "연세대학교";
+        p.grade = 4;
+        p.offense += 15; p.defense += 15; // 대학 진학 스탯 폭발적 교정
+        log("<span class='txt-event'>[대학 진학] 대학 리그 주전으로 뛰며 몸집과 스탯을 폭발적으로 끌어올립니다!</span>");
+        nextTurn();
+    }
+
+    // 4. FA & 바이아웃 시스템
+    function handleFAEvent() {
+        p.kboYears = 0; // FA 재설정
+        log("<br><span class='txt-event'>[FA 자격 획득] KBO 자유계약선수(FA) 시장에 나갑니다!</span>");
+        
+        let html = `
+            <p style="text-align:center; color:#f2e05a;"><b>[FA 계약 제안]</b></p>
+            <button class="btn" onclick="signFA('KIA 타이거즈', 800000)">KIA 타이거즈 4년 80억 계약</button>
+            <button class="btn btn-sec" onclick="signFA('LG 트윈스', 1000000)">LG 트윈스 4년 100억 계약 (바이아웃 포함)</button>
+        `;
+        document.getElementById("action-area").innerHTML = html;
+    }
+
+    function signFA(teamName, money) {
+        p.team = teamName;
+        p.contractMoney += money;
+        log(`<span class='txt-success'>[FA 대박] ${teamName}와 초대형 계약을 체결했습니다!</span>`);
+        nextTurn();
+    }
+
+    // 5. 은퇴 연출
+    function triggerEpilogue() {
+        document.getElementById("action-area").innerHTML = "";
+        const overlay = document.getElementById("epilogue-overlay");
+        const crawl = document.getElementById("crawl-text");
+        
+        crawl.innerHTML = `
+            <h2>EPISODE FINAL</h2><br>
+            <p>그저 공 하나에 울고 웃던 어린 소년이 있었습니다.</p><br>
+            <p>차가운 벤치와 흙먼지 속에서 시작되었던 여정,</p>
+            <p>총 ${p.defyCount}번의 불꽃같던 항명과 ${p.hr}개의 홈런,</p>
+            <p>그리고 팀을 구했던 ${p.defenseWins}번의 결정적 호수비는</p>
+            <p>초록빛 잔디 위에 전설로 새겨졌습니다.</p><br>
+            <p><b>"잘 가라, 우리들의 에이스여."</b></p>
+        `;
+        
+        overlay.style.display = "block";
+        setTimeout(() => {
+            overlay.style.display = "none";
+            showResultCard();
+        }, 12000);
+    }
+
+    function showResultCard() {
+        const card = document.getElementById("result-card");
+        document.getElementById("card-title").innerText = `<${p.name}> - 바람을 거스른 KBO 전설`;
+        document.getElementById("card-stats").innerHTML = `
+            • 최종 소속: ${p.team}<br>
+            • 최종 능력치(OVR): <b style="color:#58a6ff;">${getOvr()}</b> (무한 성장)<br>
+            • 통산 안타: ${p.hits}개 | 통산 홈런: ${p.hr}개<br>
+            • 통산 호수비: ${p.defenseWins}회 | 감독 항명: ${p.defyCount}회<br>
+            • 누적 수입: ${(p.contractMoney/10000).toFixed(1)}억 원
+        `;
+        card.style.display = "block";
+        localStorage.removeItem("kbo_baseball_save");
+    }
+
+    // 게임 개시
+    initGame();
+</script>
+</body>
+</html>
